@@ -13,11 +13,13 @@
 #define PRINTLEN 100
 #define SILENT 1
 #define THRNO 8
+#define LOGTIME 10
 
 typedef struct { uint32_t num[BNUM_LEN]; } bnum_t;
 unsigned char lut[BNUM_LEN * 32][PRINTLEN];
 pthread_mutex_t printmutex = PTHREAD_MUTEX_INITIALIZER;
 bnum_t startpoint = { { 0, 0, 2 } };
+
 
 uint32_t adc(uint32_t a, uint32_t b, int *carry)
 {
@@ -29,11 +31,24 @@ uint32_t adc(uint32_t a, uint32_t b, int *carry)
 
 int add(bnum_t *s, bnum_t * const a, bnum_t * const b, int cin)
 {
-	size_t i;
 	int carry = cin;
 
-	for (i = 0; i < BNUM_LEN; ++i)
+	for (size_t i = 0; i < BNUM_LEN; ++i)
 		s->num[i] = adc(a->num[i], b->num[i], &carry);
+
+	return carry;
+}
+
+
+int addlsl(bnum_t *s, bnum_t * const a, bnum_t * const b, int cin)
+{
+	int lslcarry, carry = cin;
+
+	for (size_t i = 0; i < BNUM_LEN; ++i) {
+		lslcarry = !!(b->num[i] & (1UL << 31));
+		s->num[i] = adc(a->num[i], b->num[i] << 1, &carry);
+		carry += lslcarry;
+	}
 
 	return carry;
 }
@@ -41,10 +56,9 @@ int add(bnum_t *s, bnum_t * const a, bnum_t * const b, int cin)
 
 int lsr(bnum_t *a)
 {
-	size_t i;
 	int carry = a->num[0] & 1;
 
-	for (i = 0; i < BNUM_LEN - 1; ++i)
+	for (size_t i = 0; i < BNUM_LEN - 1; ++i)
 		a->num[i] = (a->num[i] >> 1) | ((a->num[i + 1] & 1) << 31);
 
 	a->num[BNUM_LEN - 1] >>= 1;
@@ -53,29 +67,11 @@ int lsr(bnum_t *a)
 }
 
 
-int lsl(bnum_t *a)
-{
-	size_t i;
-	int carry = a->num[BNUM_LEN - 1] >> 31;
-
-	for (i = BNUM_LEN - 1; i > 0; --i)
-		a->num[i] = (a->num[i] << 1) | ((a->num[i - 1] & (1UL << 31)) >> 31);
-
-	a->num[0] <<= 1;
-
-	return carry;
-}
-
-
 int next(bnum_t *n)
 {
-	bnum_t a = *n, b;
-
 	if (n->num[0] & 1) {
-		if (lsl(n) || add(&b, n, &a, 1))
+		if (addlsl(n, n, n, 1))
 			return -1;
-
-		*n = b;
 	}
 
 	lsr(n);
@@ -86,25 +82,17 @@ int next(bnum_t *n)
 
 int checkpow2(bnum_t * const n)
 {
-	size_t i, j;
-	int ones = 0, t;
+	int ones = 0;
+	uint32_t num;
 
-	for (i = 0; i < BNUM_LEN; ++i) {
-		if (n->num[i] == 0)
-			continue;
+	for (size_t i = 0; i < BNUM_LEN; ++i) {
+		num = n->num[i];
 
-		for (t = 0, j = 0; j < 32; ++j) {
-			if (n->num[i] & (1UL << j)) {
-				if (t)
-					return 0;
-				++t;
-			}
+		while (num) {
+			num &= num - 1;
+			if (ones++)
+				return 0;
 		}
-
-		if (t & ones)
-			return 0;
-
-		++ones;
 	}
 
 	return ones;
@@ -113,9 +101,7 @@ int checkpow2(bnum_t * const n)
 
 int compare(bnum_t * const a, bnum_t * const b)
 {
-	int i;
-
-	for (i = BNUM_LEN; i >= 0; --i) {
+	for (int i = BNUM_LEN; i >= 0; --i) {
 		if (a->num[i] < b->num[i])
 			return 1;
 	}
@@ -127,9 +113,8 @@ int compare(bnum_t * const a, bnum_t * const b)
 void add_digs(unsigned char a[PRINTLEN], const unsigned char b[PRINTLEN])
 {
 	unsigned char carry = 0;
-	int i;
 
-	for (i = 0; i < PRINTLEN; ++i) {
+	for (int i = 0; i < PRINTLEN; ++i) {
 		a[i] = a[i] + b[i] + carry;
 		carry = 0;
 		if (a[i] > 9) {
@@ -140,21 +125,24 @@ void add_digs(unsigned char a[PRINTLEN], const unsigned char b[PRINTLEN])
 }
 
 
-void print(bnum_t * const n)
+const char *bnum2str(bnum_t * const n)
 {
-	char str[PRINTLEN + 1], *toprint;
+	static char str[PRINTLEN + 1];
 	unsigned char digs[PRINTLEN] = { 0 };
-	int i, j;
+	int lastdig = 0;
 
-	for (i = 0; i < BNUM_LEN; ++i) {
-		for (j = 0; j < 32; ++j) {
+	for (int i = 0; i < BNUM_LEN; ++i) {
+		for (int j = 0; j < 32; ++j) {
 			if (n->num[i] & (1UL << j))
 				add_digs(digs, lut[(32 * i) + j]);
 		}
 	}
 
-	for (i = 0; i < PRINTLEN; ++i)
+	for (int i = 0; i < PRINTLEN; ++i) {
 		str[PRINTLEN - 1 - i] = '0' + digs[i];
+		if (digs[i])
+			lastdig = i;
+	}
 
 	str[PRINTLEN] = '\0';
 /*
@@ -162,10 +150,8 @@ void print(bnum_t * const n)
 		printf("%d ", n->num[i]);
 	printf("\n");
 */
-	for (toprint = str; *toprint == '0'; ++toprint)
-		;
 
-	printf("%s\n", toprint);
+	return &str[PRINTLEN - 1 - lastdig];
 }
 
 
@@ -173,7 +159,8 @@ void *thread(void *arg)
 {
 	bnum_t start = startpoint, inc = { { 0 } }, curr;
 	int threadno = (int)(uintptr_t)arg, spoints = 0;
-	time_t prev = time(NULL), now;
+	time_t prev = time(NULL) + threadno, now;
+	const char *str;
 
 	inc.num[0] = (THRNO + threadno) * 2;
 	start.num[0] |= 1;
@@ -181,20 +168,20 @@ void *thread(void *arg)
 	while (1) {
 		if (SILENT) {
 			now = time(NULL);
-			if (now - prev > 5) {
+			if (now - prev > LOGTIME) {
 				prev = now;
+				str = bnum2str(&start);
 				pthread_mutex_lock(&printmutex);
-				printf("t%d: %d sp/s. curr: ", threadno, spoints / 5);
-				print(&start);
+				printf("t%d: %d ksp/s. curr: %s\n", threadno, (spoints / LOGTIME) / 1000, str);
 				pthread_mutex_unlock(&printmutex);
 				spoints = 0;
 			}
 		}
 
 		if (!SILENT) {
+			str = bnum2str(&start);
 			pthread_mutex_lock(&printmutex);
-			printf("thread %d: New starting point:\n", threadno);
-			print(&start);
+			printf("thread %d: New starting point: %s\n", threadno, str);
 			pthread_mutex_unlock(&printmutex);
 		}
 		curr = start;
@@ -230,11 +217,11 @@ void *thread(void *arg)
 
 			if (memcmp(&start, &curr, sizeof(start)) == 0) {
 				pthread_mutex_lock(&printmutex);
-				printf("thread %d: FOUND NEW LOOP!\n", threadno);
-				printf("thread %d: curr: ", threadno);
-				print(&curr);
-				printf("thread %d: start: ", threadno);
-				print(&start);
+				printf("thread %d: FOUND LOOP!\n", threadno);
+				str = bnum2str(&curr);
+				printf("thread %d: curr: %s\n", threadno, str);
+				str = bnum2str(&start);
+				printf("thread %d: start: %s\n", threadno, str);
 				pthread_mutex_unlock(&printmutex);
 				exit(0);
 			}
