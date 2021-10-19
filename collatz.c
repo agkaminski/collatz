@@ -184,7 +184,7 @@ void *thread(void *arg)
 			if (now - prev > 5) {
 				prev = now;
 				pthread_mutex_lock(&printmutex);
-				printf("thread %d: %d sp/s. Current starting point:", threadno, spoints / 5);
+				printf("t%d: %d sp/s. curr: ", threadno, spoints / 5);
 				print(&start);
 				pthread_mutex_unlock(&printmutex);
 				spoints = 0;
