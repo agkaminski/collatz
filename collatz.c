@@ -27,7 +27,7 @@ uint32_t adc(uint32_t a, uint32_t b, int *carry)
 }
 
 
-int add(bnum_t *s, bnum_t *a, bnum_t *b, int cin)
+int add(bnum_t *s, bnum_t * const a, bnum_t * const b, int cin)
 {
 	size_t i;
 	int carry = cin;
@@ -84,7 +84,7 @@ int next(bnum_t *n)
 }
 
 
-int checkpow2(bnum_t *n)
+int checkpow2(bnum_t * const n)
 {
 	size_t i, j;
 	int ones = 0, t;
@@ -111,7 +111,7 @@ int checkpow2(bnum_t *n)
 }
 
 
-void add_digs(unsigned char a[PRINTLEN], unsigned char b[PRINTLEN])
+void add_digs(unsigned char a[PRINTLEN], const unsigned char b[PRINTLEN])
 {
 	unsigned char carry = 0;
 	int i;
@@ -127,7 +127,7 @@ void add_digs(unsigned char a[PRINTLEN], unsigned char b[PRINTLEN])
 }
 
 
-void print(bnum_t *n)
+void print(bnum_t * const n)
 {
 	char str[PRINTLEN + 1], *toprint;
 	unsigned char digs[PRINTLEN] = { 0 };
@@ -162,7 +162,7 @@ void *thread(void *arg)
 	int threadno = (int)(uintptr_t)arg, spoints = 0;
 	time_t prev = time(NULL), now;
 
-	inc.num[0] = (THRNO + threadno) * 2;
+	inc.num[0] = (THRNO + threadno) * 2 + 1;
 
 	while (1) {
 		if (SILENT) {
