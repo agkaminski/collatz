@@ -175,7 +175,8 @@ void *thread(void *arg)
 	int threadno = (int)(uintptr_t)arg, spoints = 0;
 	time_t prev = time(NULL), now;
 
-	inc.num[0] = (THRNO + threadno) * 2 + 1;
+	inc.num[0] = (THRNO + threadno) * 2;
+	start.num[0] |= 1;
 
 	while (1) {
 		if (SILENT) {
