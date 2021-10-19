@@ -111,6 +111,19 @@ int checkpow2(bnum_t * const n)
 }
 
 
+int compare(bnum_t * const a, bnum_t * const b)
+{
+	int i;
+
+	for (i = BNUM_LEN; i >= 0; --i) {
+		if (a->num[i] < b->num[i])
+			return 1;
+	}
+
+	return 0;
+}
+
+
 void add_digs(unsigned char a[PRINTLEN], const unsigned char b[PRINTLEN])
 {
 	unsigned char carry = 0;
@@ -192,6 +205,17 @@ void *thread(void *arg)
 				printf("thread %d: overflow!\n", threadno);
 				pthread_mutex_unlock(&printmutex);
 				exit(1);
+			}
+
+			/* Assume that everything below original starting point
+			 * does not give cycle */
+			if (compare(&curr, &start)) {
+				if (!SILENT) {
+					pthread_mutex_lock(&printmutex);
+					printf("thread %d: fail, curr below startpoint\n", threadno);
+					pthread_mutex_unlock(&printmutex);
+				}
+				break;
 			}
 
 			if (checkpow2(&curr)) {
