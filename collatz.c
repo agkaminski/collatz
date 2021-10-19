@@ -14,10 +14,10 @@
 #define SILENT 1
 #define THRNO 8
 
-typedef struct { uint32_t num[16]; } bnum_t;
+typedef struct { uint32_t num[BNUM_LEN]; } bnum_t;
 unsigned char lut[BNUM_LEN * 32][PRINTLEN];
 pthread_mutex_t printmutex = PTHREAD_MUTEX_INITIALIZER;
-bnum_t startpoint = { { 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+bnum_t startpoint = { { 0, 0, 2 } };
 
 uint32_t adc(uint32_t a, uint32_t b, int *carry)
 {
@@ -158,7 +158,7 @@ void print(bnum_t *n)
 
 void *thread(void *arg)
 {
-	bnum_t start = startpoint, inc = { { 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0, 0, 0, 0, 0 } }, curr;
+	bnum_t start = startpoint, inc = { { 0 } }, curr;
 	int threadno = (int)(uintptr_t)arg, spoints = 0;
 	time_t prev = time(NULL), now;
 
