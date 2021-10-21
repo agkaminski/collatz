@@ -9,11 +9,7 @@
 #include <time.h>
 #include <pthread.h>
 
-#define BNUM_LEN 8
-#define PRINTLEN 100
-#define SILENT 1
-#define THRNO 8
-#define LOGTIME 10
+#include "config.h"
 
 typedef struct { uint32_t num[BNUM_LEN]; } bnum_t;
 unsigned char lut[BNUM_LEN * 32][PRINTLEN];
@@ -101,7 +97,7 @@ int checkpow2(bnum_t * const n)
 
 int compare(bnum_t * const a, bnum_t * const b)
 {
-	for (int i = BNUM_LEN; i >= 0; --i) {
+	for (int i = BNUM_LEN - 1; i >= 0; --i) {
 		if (a->num[i] < b->num[i])
 			return 1;
 	}
